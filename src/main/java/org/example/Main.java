@@ -4,10 +4,8 @@ import scala.Tuple2;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -15,9 +13,7 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Pattern;
 
 public class Main {
     public static void main(String[] args) {
@@ -48,7 +44,7 @@ public class Main {
         // Q1b
         JavaRDD<String> lines = spark.read().textFile(filePath).javaRDD();
 
-        // Q2
+        // Q2 
         // Only keep the rows with at least 3 columns (so with a rating)
         // Then map the rows to a tuple with the user id and a tuple with the count and the rating
         JavaPairRDD<String, Tuple2<Integer,Double>> userRatings = lines
@@ -69,11 +65,28 @@ public class Main {
         JavaPairRDD<String, Double> userAverageRatings = userRatingsCount
                 .mapValues(tuple -> tuple._2() / tuple._1());
 
-        // Find the user with the highest average rating
+        // Find the user highest average rating
         Tuple2<String, Double> topUser = userAverageRatings
                 .reduce((a, b) -> a._2() > b._2() ? a : b);
 
         System.out.println("Top user: " + topUser._1() + " with average rating: " + topUser._2());
+
+        // Q3
+        // Get list of users where rating is equal to the highest average rating
+        double highestRating = topUser._2();
+        List<Tuple2<String, Double>> usersWithHighestRating = userAverageRatings
+                .filter(tuple -> Math.abs(tuple._2() - highestRating) < 0.0001) // Use small epsilon for double comparison
+                .collect();
+        
+        // Print the user with the lowest userId only from users with highest rating
+        Tuple2<String, Double> userWithLowestId = usersWithHighestRating
+                .stream()
+                .min((a, b) -> a._1().compareTo(b._1()))
+                .get();
+        
+     
+        System.out.println("User with highest rating (and lowest userId if multiple users have the same average rating): " + 
+                userWithLowestId._1() + " with rating: " + userWithLowestId._2());
 
         spark.stop();
     }
